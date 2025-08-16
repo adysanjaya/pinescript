@@ -1,0 +1,351 @@
+//@version=6
+indicator("Order Block + EMA Cross + Pivot Points", overlay=true, max_boxes_count=500, max_labels_count=500, max_lines_count=500)
+showOrderBlocks = input.bool(true, "Show Order Blocks Lux Algo", group="Enable Features")
+showEMACross = input.bool(true, "Show EMA Cross", group="Enable Features")
+showPivotPoints = input.bool(true, "Show Pivot Points", group="Enable Features")
+
+DEFAULT_COLOR = #FB8C00
+DEFAULT_COLOR_RED = #F23545
+DEFAULT_COLOR_GREEN = #4CAF4F
+DEFAULT_COLOR_BLUE = #2862FF
+
+// ========== ORDER BLOCK ==========
+
+// --- Order Block Detector Settings ---
+length_ob = input.int(5, 'Volume Pivot Length', minval=1, group="Order Block Settings")
+bull_ext_last = input.int(3, 'Bullish OB', minval=1, group="Order Block Settings")
+bg_bull_css = input.color(color.new(#169400,80), 'Bullish OB Background', group="Order Block Settings")
+bull_css = input.color(#169400, 'Bullish OB Border', group="Order Block Settings")
+bull_avg_css = input.color(color.new(#9598a1,37), 'Bullish OB Average Line', group="Order Block Settings")
+bear_ext_last = input.int(3, 'Bearish OB', minval=1, group="Order Block Settings")
+bg_bear_css = input.color(color.new(#ff1100,80), 'Bearish OB Background', group="Order Block Settings")
+bear_css = input.color(#ff1100, 'Bearish OB Border', group="Order Block Settings")
+bear_avg_css = input.color(color.new(#9598a1,37), 'Bearish OB Average Line', group="Order Block Settings")
+line_style = input.string('⎯⎯⎯', 'Average Line Style', options=['⎯⎯⎯','----','····'], group="Order Block Settings")
+line_width = input.int(1, 'Average Line Width', minval=1, group="Order Block Settings")
+mitigation = input.string('Wick', 'Mitigation Methods', options=['Wick','Close'], group="Order Block Settings")
+
+// --- EMA Cross Settings ---
+len13 = input.int(13, minval=1, title="EMA 13 Length", group="EMA Settings")
+src13 = input(close, title="EMA 13 Source", group="EMA Settings")
+offset13 = input.int(title="EMA 13 Offset", defval=0, minval=-500, maxval=500, group="EMA Settings", display=display.data_window)
+len21 = input.int(21, minval=1, title="EMA 21 Length", group="EMA Settings")
+src21 = input(close, title="EMA 21 Source", group="EMA Settings")
+offset21 = input.int(title="EMA 21 Offset", defval=0, minval=-500, maxval=500, group="EMA Settings", display=display.data_window)
+
+// --- Smoothing MA Settings ---
+GRP = "Smoothing MA Settings"
+TT_BB = "Only applies when 'SMA + Bollinger Bands' is selected. Determines the distance between the SMA and the bands."
+maTypeInput = input.string("None", "Type", options=["None", "SMA", "SMA + Bollinger Bands", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group=GRP, display=display.data_window)
+maLengthInput = input.int(14, "Length", group=GRP, display=display.data_window)
+bbMultInput = input.float(2.0, "BB StdDev", minval=0.001, maxval=50, step=0.5, tooltip=TT_BB, group=GRP, display=display.data_window)
+var enableMA = maTypeInput != "None"
+var isBB = maTypeInput == "SMA + Bollinger Bands"
+
+// --- Functions ---
+
+// Order Block: Line Style
+get_line_style(style) =>
+    switch style
+        '⎯⎯⎯' => line.style_solid
+        '----' => line.style_dashed
+        '····' => line.style_dotted
+
+// Order Block: Get Coordinates
+get_coordinates(condition, top, btm, ob_val) =>
+    var array<float> ob_top = array.new_float()
+    var array<float> ob_btm = array.new_float()
+    var array<float> ob_avg = array.new_float()
+    var array<int> ob_left = array.new_int()
+    float ob = na
+    if bool(condition)
+        avg = math.avg(top, btm)
+        array.unshift(ob_top, top)
+        array.unshift(ob_btm, btm)
+        array.unshift(ob_avg, avg)
+        array.unshift(ob_left, time[length_ob])
+        ob := ob_val
+    [ob_top, ob_btm, ob_avg, ob_left, ob]
+
+// Order Block: Remove Mitigated
+remove_mitigated(ob_top, ob_btm, ob_left, ob_avg, target, bool bull) =>
+    bool mitigated = false
+    array<float> target_array = bull ? ob_btm : ob_top
+    for element in target_array
+        idx = array.indexof(target_array, element)
+        if bull ? (target < element) : (target > element)
+            mitigated := true
+            array.remove(ob_top, idx)
+            array.remove(ob_btm, idx)
+            array.remove(ob_avg, idx)
+            array.remove(ob_left, idx)
+    mitigated
+
+// Order Block: Set Order Blocks
+set_order_blocks(ob_top, ob_btm, ob_left, ob_avg, ext_last, bg_css, border_css, lvl_css) =>
+    var array<box> ob_box = array.new_box()
+    var array<line> ob_lvl = array.new_line()
+    if barstate.isfirst
+        for i = 0 to ext_last - 1
+            array.unshift(ob_box, box.new(na, na, na, na, xloc=xloc.bar_time, extend=extend.right, bgcolor=bg_css, border_color=color.new(border_css,70)))
+            array.unshift(ob_lvl, line.new(na, na, na, na, xloc=xloc.bar_time, extend=extend.right, color=lvl_css, style=get_line_style(line_style), width=line_width))
+    if barstate.islast
+        if array.size(ob_top) > 0
+            for i = 0 to math.min(ext_last - 1, array.size(ob_top) - 1)
+                b = array.get(ob_box, i)
+                l = array.get(ob_lvl, i)
+                box.set_lefttop(b, array.get(ob_left, i), array.get(ob_top, i))
+                box.set_rightbottom(b, array.get(ob_left, i), array.get(ob_btm, i))
+                line.set_xy1(l, array.get(ob_left, i), array.get(ob_avg, i))
+                line.set_xy2(l, array.get(ob_left, i) + 1, array.get(ob_avg, i))
+
+// Smoothing MA Calculation
+ma(source, length, MAtype) =>
+    switch MAtype
+        "SMA"                   => ta.sma(source, length)
+        "SMA + Bollinger Bands" => ta.sma(source, length)
+        "EMA"                   => ta.ema(source, length)
+        "SMMA (RMA)"            => ta.rma(source, length)
+        "WMA"                   => ta.wma(source, length)
+        "VWMA"                  => ta.vwma(source, length)
+
+// --- Order Block Calculations ---
+var int os = 0
+var float target_bull = na
+var float target_bear = na
+
+n = bar_index
+upper = ta.highest(length_ob)
+lower = ta.lowest(length_ob)
+
+target_bull := mitigation == 'Close' ? ta.lowest(close, length_ob) : lower
+target_bear := mitigation == 'Close' ? ta.highest(close, length_ob) : upper
+
+os := high[length_ob] > upper ? 0 : low[length_ob] < lower ? 1 : os[1]
+
+phv = ta.pivothigh(volume, length_ob, length_ob)
+cond_bull = not na(phv) and os == 1
+cond_bear = not na(phv) and os == 0
+
+[bull_top, bull_btm, bull_avg, bull_left, bull_ob] = get_coordinates(cond_bull, hl2[length_ob], low[length_ob], low[length_ob])
+[bear_top, bear_btm, bear_avg, bear_left, bear_ob] = get_coordinates(cond_bear, high[length_ob], hl2[length_ob], high[length_ob])
+
+// Remove Mitigated Order Blocks
+mitigated_bull = remove_mitigated(bull_top, bull_btm, bull_left, bull_avg, target_bull, true)
+mitigated_bear = remove_mitigated(bear_top, bear_btm, bear_left, bear_avg, target_bear, false)
+
+// --- EMA Calculations ---
+out13 = ta.ema(src13, len13)
+out21 = ta.ema(src21, len21)
+
+// Smoothing MA Calculations
+smoothingMA13 = enableMA ? ma(out13, maLengthInput, maTypeInput) : na
+smoothingStDev13 = isBB ? ta.stdev(out13, maLengthInput) * bbMultInput : na
+smoothingMA21 = enableMA ? ma(out21, maLengthInput, maTypeInput) : na
+smoothingStDev21 = isBB ? ta.stdev(out21, maLengthInput) * bbMultInput : na
+
+// --- Display ---
+
+// Order Blocks
+if showOrderBlocks
+    set_order_blocks(bull_top, bull_btm, bull_left, bull_avg, bull_ext_last, bg_bull_css, bull_css, bull_avg_css)
+    set_order_blocks(bear_top, bear_btm, bear_left, bear_avg, bear_ext_last, bg_bear_css, bear_css, bear_avg_css)
+
+plot(bull_ob, 'Bull OB', bull_css, 2, plot.style_linebr, offset=-length_ob, display=display.none)
+plot(bear_ob, 'Bear OB', bear_css, 2, plot.style_linebr, offset=-length_ob, display=display.none)
+
+// EMA Plots
+plot(showEMACross ? out13 : na, title="EMA 13", color=color.green, offset=offset13)
+plot(showEMACross ? out21 : na, title="EMA 21", color=color.red, offset=offset21)
+plot(showEMACross ? ta.cross(out13, out21) ? out13 : na : na, color=color.new(color.blue, 0), style=plot.style_cross, linewidth=4, title="EMA Cross")
+
+// Smoothing MA Plots for EMA 13
+plot(showEMACross ? smoothingMA13 : na, "EMA 13-based MA", color=color.yellow, display=enableMA ? display.all : display.none, editable=enableMA)
+bbUpperBand13 = plot(showEMACross ? smoothingMA13 + smoothingStDev13 : na, title="EMA 13 Upper Bollinger Band", color=color.green, display=isBB ? display.all : display.none, editable=isBB)
+bbLowerBand13 = plot(showEMACross ? smoothingMA13 - smoothingStDev13 : na, title="EMA 13 Lower Bollinger Band", color=color.green, display=isBB ? display.all : display.none, editable=isBB)
+fill(bbUpperBand13, bbLowerBand13, color=isBB ? color.new(color.green, 90) : na, title="EMA 13 Bollinger Bands Background Fill", display=isBB ? display.all : display.none, editable=isBB)
+
+// Smoothing MA Plots for EMA 21
+plot(showEMACross ? smoothingMA21 : na, "EMA 21-based MA", color=color.orange, display=enableMA ? display.all : display.none, editable=enableMA)
+bbUpperBand21 = plot(showEMACross ? smoothingMA21 + smoothingStDev21 : na, title="EMA 21 Upper Bollinger Band", color=color.purple, display=isBB ? display.all : display.none, editable=isBB)
+bbLowerBand21 = plot(showEMACross ? smoothingMA21 - smoothingStDev21 : na, title="EMA 21 Lower Bollinger Band", color=color.purple, display=isBB ? display.all : display.none, editable=isBB)
+fill(bbUpperBand21, bbLowerBand21, color=isBB ? color.new(color.purple, 90) : na, title="EMA 21 Bollinger Bands Background Fill", display=isBB ? display.all : display.none, editable=isBB)
+
+// --- Alerts ---
+alertcondition(bool(bull_ob), 'Bullish OB Formed', 'Bullish order block detected')
+alertcondition(bool(bear_ob), 'Bearish OB Formed', 'Bearish order block detected')
+alertcondition(mitigated_bull, 'Bullish OB Mitigated', 'Bullish order block mitigated')
+alertcondition(mitigated_bear, 'Bearish OB Mitigated', 'Bearish order block mitigated')
+alertcondition(ta.crossover(out13, out21), 'EMA 13 Cross Above EMA 21', 'EMA 13 crossed above EMA 21')
+alertcondition(ta.crossunder(out13, out21), 'EMA 13 Cross Below EMA 21', 'EMA 13 crossed below EMA 21')
+
+// ========== PIVOT POINTS START ==========
+//@variable reused to prevent conflict
+var FIRST_BAR_TIME_PIVOT = time
+
+pivotTypeInput = input.string(title="Type", defval="Traditional", options=["Traditional", "Fibonacci", "Woodie", "Classic", "DM", "Camarilla"])
+pivotAnchorInput = input.string(title="Pivots Timeframe", defval="Auto", options=["Auto", "Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Biyearly", "Triyearly", "Quinquennially", "Decennially"])
+maxHistoricalPivotsInput = input.int(title="Number of Pivots Back", defval=15, minval=1, maxval=200, display = display.data_window)
+isDailyBasedInput = input.bool(title="Use Daily-based Values", defval=true, display = display.data_window, tooltip="When this option is unchecked, Pivot Points will use intraday data while calculating on intraday charts. If Extended Hours are displayed on the chart, they will be taken into account during the pivot level calculation. If intraday OHLC values are different from daily-based values (normal for stocks), the pivot levels will also differ.")
+showLabelsInput = input.bool(title="Show Labels", defval=true, group="labels", display = display.data_window)
+showPricesInput = input.bool(title="Show Prices", defval=true, group="labels", display = display.data_window)
+positionLabelsInput = input.string("Left", "Labels Position", options=["Left", "Right"], group="labels", display = display.data_window)
+linewidthInput = input.int(title="Line Width", defval=1, minval=1, maxval=100, group="levels", display = display.data_window)
+
+
+pColorInput = input.color(DEFAULT_COLOR_BLUE, "P‏  ‏  ‏", inline="P", group="levels", display = display.data_window)
+pShowInput = input.bool(true, "", inline="P", group="levels", display = display.data_window)
+s1ColorInput = input.color(DEFAULT_COLOR_GREEN, "S1", inline="S1/R1" , group="levels", display = display.data_window)
+s1ShowInput = input.bool(true, "", inline="S1/R1", group="levels", display = display.data_window)
+r1ColorInput = input.color(DEFAULT_COLOR_RED, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R1", inline="S1/R1", group="levels", display = display.data_window)
+r1ShowInput = input.bool(true, "", inline="S1/R1", group="levels", display = display.data_window)
+s2ColorInput = input.color(DEFAULT_COLOR_GREEN, "S2", inline="S2/R2", group="levels", display = display.data_window)
+s2ShowInput = input.bool(true, "", inline="S2/R2", group="levels", display = display.data_window)
+r2ColorInput = input.color(DEFAULT_COLOR_RED, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R2", inline="S2/R2", group="levels", display = display.data_window)
+r2ShowInput = input.bool(true, "", inline="S2/R2", group="levels", tooltip = "Not applicable to DM", display = display.data_window)
+s3ColorInput = input.color(DEFAULT_COLOR_GREEN, "S3", inline="S3/R3", group="levels", display = display.data_window)
+s3ShowInput = input.bool(false, "", inline="S3/R3", group="levels", display = display.data_window)
+r3ColorInput = input.color(DEFAULT_COLOR_RED, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R3", inline="S3/R3", group="levels", display = display.data_window)
+r3ShowInput = input.bool(true, "", inline="S3/R3", group="levels", tooltip = "Not applicable to DM", display = display.data_window)
+s4ColorInput = input.color(DEFAULT_COLOR_GREEN, "S4", inline="S4/R4", group="levels", display = display.data_window)
+s4ShowInput = input.bool(false, "", inline="S4/R4", group="levels", display = display.data_window)
+r4ColorInput = input.color(DEFAULT_COLOR_RED, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R4", inline="S4/R4", group="levels", display = display.data_window)
+r4ShowInput = input.bool(false, "", inline="S4/R4", group="levels", tooltip = "Not applicable to: Fibonacci, DM", display = display.data_window)
+s5ColorInput = input.color(DEFAULT_COLOR_GREEN, "S5", inline="S5/R5", group="levels", display = display.data_window)
+s5ShowInput = input.bool(false, "", inline="S5/R5", group="levels", display = display.data_window)
+r5ColorInput = input.color(DEFAULT_COLOR_RED, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R5", inline="S5/R5", group="levels", display = display.data_window)
+r5ShowInput = input.bool(false, "", inline="S5/R5", group="levels", tooltip = "Not applicable to: Fibonacci, Woodie, Classic, DM", display = display.data_window)
+
+type graphicSettings
+    string levelName
+    color levelColor
+    bool showLevel
+
+var graphicSettingsArray = array.from(
+      graphicSettings.new(" P", pColorInput, pShowInput),
+      graphicSettings.new("R1", r1ColorInput, r1ShowInput), graphicSettings.new("S1", s1ColorInput, s1ShowInput),
+      graphicSettings.new("R2", r2ColorInput, r2ShowInput), graphicSettings.new("S2", s2ColorInput, s2ShowInput),
+      graphicSettings.new("R3", r3ColorInput, r3ShowInput), graphicSettings.new("S3", s3ColorInput, s3ShowInput),
+      graphicSettings.new("R4", r4ColorInput, r4ShowInput), graphicSettings.new("S4", s4ColorInput, s4ShowInput),
+      graphicSettings.new("R5", r5ColorInput, r5ShowInput), graphicSettings.new("S5", s5ColorInput, s5ShowInput))
+
+autoAnchor = switch
+    timeframe.isintraday => timeframe.multiplier <= 15 ? "1D" : "1W"
+    timeframe.isdaily    => "1M"
+    => "12M"
+
+pivotTimeframe = switch pivotAnchorInput
+    "Auto"      => autoAnchor
+    "Daily"     => "1D"
+    "Weekly"    => "1W"
+    "Monthly"   => "1M"
+    "Quarterly" => "3M"
+    => "12M"
+
+//@variable The number of years in the selected Pivot period
+pivotYearMultiplier = switch pivotAnchorInput
+    "Biyearly"       => 2
+    "Triyearly"      => 3
+    "Quinquennially" => 5
+    "Decennially"    => 10
+    => 1
+
+//@variable The number of values in the pivots of the selected type
+numOfPivotLevels = switch pivotTypeInput
+    "Traditional" => 11
+    "Camarilla"   => 11
+    "Woodie"      => 9
+    "Classic"     => 9
+    "Fibonacci"   => 7
+    "DM"          => 3
+
+type pivotGraphic
+    line pivotLine
+    label pivotLabel
+
+method delete(pivotGraphic graphic) =>
+    graphic.pivotLine.delete()
+    graphic.pivotLabel.delete()
+
+var drawnGraphics = matrix.new<pivotGraphic>()
+
+localPivotTimeframeChange = timeframe.change(pivotTimeframe) and year % pivotYearMultiplier == 0
+securityPivotTimeframeChange = timeframe.change(timeframe.period) and year % pivotYearMultiplier == 0
+
+pivotTimeframeChangeCounter(condition) => 
+    var count = 0
+    if condition and bar_index > 0
+        count += 1
+    count
+
+localPivots = ta.pivot_point_levels(pivotTypeInput, localPivotTimeframeChange)
+securityPivotPointsArray = ta.pivot_point_levels(pivotTypeInput, securityPivotTimeframeChange)
+
+securityTimeframe = timeframe.isintraday ? "1D" : timeframe.period
+[securityPivots, securityPivotCounter] = request.security(syminfo.tickerid, pivotTimeframe, [securityPivotPointsArray, pivotTimeframeChangeCounter(securityPivotTimeframeChange)], lookahead = barmerge.lookahead_on)
+pivotPointsArray = isDailyBasedInput ? securityPivots : localPivots
+
+//@function Sets the ending points of the currently active pivots to `endTime`.
+affixOldPivots(endTime) =>
+    if drawnGraphics.rows() > 0
+        lastGraphics = drawnGraphics.row(drawnGraphics.rows() - 1)
+
+        for graphic in lastGraphics
+            graphic.pivotLine.set_x2(endTime)
+            if positionLabelsInput == "Right"
+                graphic.pivotLabel.set_x(endTime)
+
+//@function Draws pivot lines and labels from `startTime` to the approximate end of the period.
+drawNewPivots(startTime) =>
+    
+    newGraphics = array.new<pivotGraphic>()
+
+    for [index, coord] in pivotPointsArray
+        levelSettings = graphicSettingsArray.get(index)
+        if not na(coord) and levelSettings.showLevel
+            lineEndTime = startTime + timeframe.in_seconds(pivotTimeframe) * 1000 * pivotYearMultiplier
+            pivotLine = line.new(startTime, coord, lineEndTime, coord, xloc = xloc.bar_time, color=levelSettings.levelColor, width=linewidthInput)
+            pivotLabel = label.new(x = positionLabelsInput == "Left" ? startTime : lineEndTime,
+                               y = coord,
+                               text = (showLabelsInput ? levelSettings.levelName + " " : "") + (showPricesInput ? "(" + str.tostring(coord, format.mintick) + ")" : ""),
+                               style = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left,
+                               textcolor = levelSettings.levelColor,
+                               color = #00000000,
+                               xloc=xloc.bar_time)
+            
+            newGraphics.push(pivotGraphic.new(pivotLine, pivotLabel))
+    
+    drawnGraphics.add_row(array_id = newGraphics)
+
+    if drawnGraphics.rows() > maxHistoricalPivotsInput
+        oldGraphics = drawnGraphics.remove_row(0)
+        
+        for graphic in oldGraphics
+            graphic.delete()
+
+
+localPivotDrawConditionStatic = not isDailyBasedInput and localPivotTimeframeChange
+securityPivotDrawConditionStatic = isDailyBasedInput and securityPivotCounter != securityPivotCounter[1]
+
+var isMultiYearly = array.from("Biyearly", "Triyearly", "Quinquennially", "Decennially").includes(pivotAnchorInput)
+localPivotDrawConditionDeveloping = not isDailyBasedInput and time_close == time_close(pivotTimeframe) and not isMultiYearly 
+securityPivotDrawConditionDeveloping = false
+
+if showPivotPoints
+    if (securityPivotDrawConditionStatic or localPivotDrawConditionStatic)
+        affixOldPivots(time)
+        drawNewPivots(time)
+
+    // If possible, draw pivots from the beginning of the chart if none were found
+    var FIRST_BAR_TIME = time
+    if (barstate.islastconfirmedhistory and drawnGraphics.columns() == 0)
+
+        if not na(securityPivots) and securityPivotCounter > 0
+            if isDailyBasedInput
+                drawNewPivots(FIRST_BAR_TIME)
+            else 
+                runtime.error("Not enough intraday data to calculate Pivot Points. Lower the Pivots Timeframe or turn on the 'Use Daily-based Values' option in the indicator settings.")
+        else
+            runtime.error("Not enough data to calculate Pivot Points. Lower the Pivots Timeframe in the indicator settings.")
+
+
