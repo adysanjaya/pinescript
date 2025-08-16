@@ -18,9 +18,9 @@ indicator(
 disp   = display.all - display.status_line
 
 rpGR   = 'Profile Generic Settings'
-rpLN   = input.int(200, '  Lookback Length / Fixed Range', minval = 10, maxval = 1500, step = 10 , group = rpGR, display = disp)
+rpLN   = input.int(200, 'Lookback Length / Fixed Range', minval = 10, maxval = 1500, step = 10 , group = rpGR, display = disp)
 rpLN  := last_bar_index > rpLN ? rpLN - 1 : last_bar_index
-vpSRC  = input.string('Volume', '  Profile Source', options = ['Volume', 'Money Flow'], group = rpGR, display = disp)
+vpSRC  = input.string('Volume', 'Profile Source', options = ['Volume', 'Money Flow'], group = rpGR, display = disp)
 
 vpGR   = 'Profile Presentation Settings'
 vpTP   = 'displays total trading activity/money flow (common interest, both buying and selling trading activity/money flow) over a specified time period at specific price levels\n\n' +
@@ -30,10 +30,10 @@ vpTP   = 'displays total trading activity/money flow (common interest, both buyi
           'row lengths, indicates the amount of the traded activity/money flow at specific price levels'
 vpSH   = input.bool(true, 'Volume/Money Flow Profile', group = vpGR, tooltip = vpTP, display = disp)
 
-vpHVC  = input.color(color.new(#ffeb3b, 50), '  High Traded Nodes', inline = 'VP1', group = vpGR)
+vpHVC  = input.color(color.new(#ffeb3b, 50), 'High Traded Nodes', inline = 'VP1', group = vpGR)
 vpHVT  = input.int(53, 'Threshold %' , minval = 50, maxval = 99 , step = 1,inline = 'VP1', group = vpGR, tooltip = 'option range [50-99]', display = disp) / 100
-vpAVC  = input.color(color.new(#2962ff, 50), '  Average Traded Nodes', group = vpGR)
-vpLVC  = input.color(color.new(#f23645, 50), '  Low Traded Nodes', inline = 'VP2', group = vpGR)
+vpAVC  = input.color(color.new(#2962ff, 50), 'Average Traded Nodes', group = vpGR)
+vpLVC  = input.color(color.new(#f23645, 50), 'Low Traded Nodes', inline = 'VP2', group = vpGR)
 vpLVT  = input.int(37, 'Threshold %' , minval = 10, maxval = 40 , step = 1,inline = 'VP2', group = vpGR, tooltip = 'option range [10-40]', display = disp) / 100
 
 spTP   = 'displays the sentiment, the dominat party over a specified time period at the specific price levels\n\n' +
@@ -47,23 +47,23 @@ spPTT  = 'conditions used to calculate the up/down volume/money flow\n\n' +
          '* bar buying/selling pressure\n   up => if (close - low) > (high - close)\n   down => if (close - low) <= (high - close)'
 spPT1  = 'Bar Polarity'
 spPT2  = 'Bar Buying/Selling Pressure'
-spPTY  = input.string(spPT1, '  Sentiment Polarity Method', options = [spPT1, spPT2], group = vpGR, tooltip = spPTT, display = disp)
+spPTY  = input.string(spPT1, 'Sentiment Polarity Method', options = [spPT1, spPT2], group = vpGR, tooltip = spPTT, display = disp)
 
-spBLC  = input.color(color.new(#26a69a, 50), '  Bullish Nodes', inline = 'SP', group = vpGR)
+spBLC  = input.color(color.new(#26a69a, 50), 'Bullish Nodes', inline = 'SP', group = vpGR)
 spBRC  = input.color(color.new(#ef5350, 50), 'Bearish Nodes', inline = 'SP', group = vpGR)
 
 hmSH   = input.bool(false, 'Profile Heatmap', group = vpGR, tooltip = 'tip : higher number of rows results with a better visuals')
 hmSO1  = 'Volume/Money Flow Profile'
-hmSRC  = input.string(hmSO1, '  Heatmap Source', options = [hmSO1, 'Sentiment Profile'], group = vpGR, display = disp)
-hmTR   = input.int(73, '  Heatmap Transparency' , minval = 0, maxval = 100 , group = vpGR, display = disp)
+hmSRC  = input.string(hmSO1, 'Heatmap Source', options = [hmSO1, 'Sentiment Profile'], group = vpGR, display = disp)
+hmTR   = input.int(73, 'Heatmap Transparency' , minval = 0, maxval = 100 , group = vpGR, display = disp)
 
 othGR  = 'Other Presentation Settings'
 
 pcTP   = 'displays the price level of the highest traded activity/money flow or the changes of the price levels with the highest traded activity/money flow'
-rpPC   = input.string('Last(Zone)', '  Level of Significance', options = ['Developing', 'Last(Line)', 'Last(Zone)', 'None'], inline='PoC', group = othGR, tooltip = pcTP, display = disp)
+rpPC   = input.string('Last(Zone)', 'Level of Significance', options = ['Developing', 'Last(Line)', 'Last(Zone)', 'None'], inline='PoC', group = othGR, tooltip = pcTP, display = disp)
 
 vaSH   = input.bool(false, 'Consolidation Zones', group = othGR, display = disp)
-vaTH   = input.int(25, '  Consolidation Threshold %' , minval = 0, maxval = 100, inline = 'va', group = othGR, display = disp) / 100
+vaTH   = input.int(25, 'Consolidation Threshold %' , minval = 0, maxval = 100, inline = 'va', group = othGR, display = disp) / 100
 vaC    = input.color(color.new(#2962ff, 73), '', inline = 'va', group = othGR)
 
 spTT   = 'displays the price zone of the highest bullish or bearish sentiment zone'
@@ -78,10 +78,10 @@ rpBGC  = input.color(color.new(#00bcd4, 95), '', inline = 'BG', group = othGR)
 
 otGR   = 'Other Profile Settings'
 
-rpNR   = input.int(25, '  Number of Rows' , minval = 10, maxval = 100 ,step = 5, group = otGR, tooltip = 'option range [10-100]', display = disp)
-rpW    = input.int(13, '  Profile Width %', minval = 10, maxval = 50, group = otGR, tooltip = 'option range [10-50]', display = disp) / 100
+rpNR   = input.int(25, 'Number of Rows' , minval = 10, maxval = 100 ,step = 5, group = otGR, tooltip = 'option range [10-100]', display = disp)
+rpW    = input.int(13, 'Profile Width %', minval = 10, maxval = 50, group = otGR, tooltip = 'option range [10-50]', display = disp) / 100
 vpLS   = input.string('Auto', "  Profile Text Size", options=['Auto', 'Tiny', 'Small'], group = otGR, display = disp)
-vpHO   = input.int(13, '  Profile Horizontal Offset', group = otGR, tooltip = 'option allows negative numbers as well, in case of a use the profiles will overlap with the price chart', display = disp)
+vpHO   = input.int(13, 'Profile Horizontal Offset', group = otGR, tooltip = 'option allows negative numbers as well, in case of a use the profiles will overlap with the price chart', display = disp)
 
 //---------------------------------------------------------------------------------------------------------------------}
 // User Defined Types
