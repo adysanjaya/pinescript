@@ -32,6 +32,7 @@ Special thanks to [LUX Algo](https://www.luxalgo.com/) for their innovative tech
 If the indicators are way too crowded, you can always modify visibility of each indicator by checking the box in the indicator's settings panel.
 
 **Note:** All script used here is free version and provided in TradingView technical indicators.
+
 **Warning:** This script is provided as-is for educational purposes. Always do your own research and consider paper trading before using any strategy with real funds.
 
 ## Previews
