@@ -10,7 +10,7 @@ Many traders can't afford premium TradingView plans that allow multiple indicato
 
 ### Credits
 
-Special thanks to [LUX Algo](https://www.luxalgo.com/) for their innovative technical analysis concepts that have inspired some of the indicators in this collection.
+Special thanks to [LUX Algo](https://www.luxalgo.com/) for their innovative technical analysis concepts which include some of the indicators in this collection.
 
 ## What Incudes
 
@@ -36,3 +36,25 @@ If the indicators are way too crowded, you can always modify visibility of each 
 This script is provided as-is for educational purposes. Always do your own research and consider paper trading before using any strategy with real funds.
 
 Pine Script continues to evolve, with regular updates and new features being added to enhance traders' capabilities on the TradingView platform.
+
+## Previews
+
+### EMA Cross
+
+![EMA Cross](images/ema_cross.png)
+
+### Order Blocks
+
+![Order Blocks](images/order_blocks.png)
+
+### Money Flow Profile
+
+![Money Flow Profile](images/money_flow_profile.png)
+
+### Smart Money Concepts
+
+![Smart Money Concepts](images/smart_money_concepts.png)
+
+### Pivot Points
+
+![Pivot Points](images/pivot_points.png)
