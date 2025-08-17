@@ -15,6 +15,8 @@ Special thanks to [LUX Algo](https://www.luxalgo.com/) for their innovative tech
 ## What Incudes
 
 - Order Block Detector (LuxAlgo)
+- Money Flow Profile (LuxAlgo)
+- Smart Money Concepts (LuxAlgo)
 - EMA Cross
 - Pivot Points
 
